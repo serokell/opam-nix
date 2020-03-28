@@ -43,7 +43,6 @@ opam2nix OPAM {..} =
     preparephase = mconcat . intersperse " " . mconcat . intersperse ["\n"]
   in
     "{ stdenv, fetchzip, " <>deps<> ", extraArgs ? { } }:\n"
-  <>"\n" -- Awful hack to allow this to evaluate even if some of the variables are undefined
   <>"stdenv.mkDerivation (let self = with self; with extraArgs; {\n"
   <>foldMap (\name' -> "  pname = \""<>name'<>"\";\n") name
   <>foldMap (\version' -> "  version = \""<>version'<>"\";\n") version
