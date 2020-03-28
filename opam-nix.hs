@@ -26,7 +26,10 @@ opam2nix :: OPAM -> String
 opam2nix OPAM {..} =
   let
     normalize = nub . map (\case 'b':'a':'s':'e':'-':_ -> "base"; s -> s)
-    buildInputs' = [ "findlib" ] ++ mconcat (maybeToList buildInputs);
+    buildInputs' = [ "findlib" ]
+      -- conf-* packages are added with {build}, hack it so that it builds!
+      ++ (filter (isPrefixOf "conf-") $ mconcat $ maybeToList nativeBuildInputs)
+      ++ mconcat (maybeToList buildInputs);
     checkInputs' = mconcat $ maybeToList checkInputs
     nativeBuildInputs' = [ "dune", "opaline", "ocaml", "findlib" ]
       ++ (if any (isPrefixOf "conf-")

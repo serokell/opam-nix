@@ -23,8 +23,7 @@ in rec {
   # Generate a nix file from an opam file
   opam2nix =
     { src, opamFile ? findOpamFile src, name ? opamFile + ".nix", ... }:
-    pkgs.runCommandNoCC name { }
-    "cat ${src}/${opamFile} | ${opam-nix} > $out";
+    pkgs.runCommandNoCC name { } "cat ${src}/${opamFile} | ${opam-nix} > $out";
 
   # Traverse OPAM repository, producing an extension to
   # ocamlPackages than includes all the packages in the repo.
@@ -66,19 +65,21 @@ in rec {
   traverseOPAMRepo' = repo: self: super:
     let traversed = traverseOPAMRepo repo self super;
     in traversed // builtins.mapAttrs (name: v:
-      v // {
-        versions = (traversed.${name} or { versions = { }; }).versions;
-      }) super;
+      if (builtins.isAttrs v) && (traversed ? ${name}) then
+        v // { versions = traversed.${name}.versions; }
+      else
+        v) super;
 
   # Extension that adds callOPAMPackage to the package set
   callOPAMPackage = self: super: {
     callOPAMPackage = src: extraArgs: overrides:
       (self.callPackage (opam2nix (extraArgs // { inherit src; }))
-      (overrides // { inherit extraArgs; })).overrideAttrs ({ buildInputs, ... }@args: {
-          inherit src;
-          buildInputs = buildInputs ++ extraArgs.extraBuildInputs or [ ];
-          propagatedBuildInputs = buildInputs
-            ++ extraArgs.extraBuildInputs or [ ];
-        });
+        (overrides // { inherit extraArgs; })).overrideAttrs
+      ({ buildInputs, ... }@args: {
+        inherit src;
+        buildInputs = buildInputs ++ extraArgs.extraBuildInputs or [ ];
+        propagatedBuildInputs = buildInputs
+          ++ extraArgs.extraBuildInputs or [ ];
+      });
   };
 }
