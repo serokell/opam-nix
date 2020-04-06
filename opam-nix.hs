@@ -18,6 +18,7 @@ data OPAM
   , buildPhase :: Maybe [[String]]
   , checkInputs :: Maybe [String]
   , checkPhase :: Maybe [[String]]
+  , installPhase :: Maybe [[String]]
   , source :: Maybe String
   } deriving Show
 
@@ -37,6 +38,9 @@ opam2nix OPAM {..} =
            then ["conf-pkg-config"]
            else [])
       ++ mconcat (maybeToList nativeBuildInputs)
+    installPhase' = case installPhase of
+      Just c -> "mkdir -p $OCAMLFIND_DESTDIR\n" <> preparephase c
+      Nothing -> "opaline -prefix $out -libdir $OCAMLFIND_DESTDIR"
     inputs = buildInputs' ++ checkInputs' ++ nativeBuildInputs'
     deps = mconcat $ intersperse ", " $ normalize $ inputs
     sepspace = mconcat . intersperse " " . normalize
@@ -60,8 +64,9 @@ opam2nix OPAM {..} =
                 "  checkPhase = ''runHook preCheck\n"
               <>preparephase checkPhase'
               <>"\nrunHook postCheck\n'';\n") checkPhase
-  <>"  installPhase = ''\nrunHook preInstall\nopaline -prefix "
-  <>"$out -libdir $OCAMLFIND_DESTDIR\nrunHook postInstall\n'';\n"
+  <>"  installPhase = ''\nrunHook preInstall\n"
+  <>installPhase'
+  <>"\n  '';\n"
   <>"}; in self // extraArgs)\n"
 
 update :: Maybe a -> a -> Maybe a
@@ -86,6 +91,9 @@ evaluateField o@OPAM {..} = \case
       $ fmap ((fmap evaluateExp) . command) $ filter (\(Command _ info) -> not $ "with-test" `elem` info) e,
     checkPhase = update checkPhase
       $ fmap ((fmap evaluateExp) . command) $ filter (\(Command _ info) -> "with-test" `elem` info) e
+  }
+  Install e -> o {
+    installPhase = update installPhase $ fmap ((fmap evaluateExp) . command) e
   }
   URL url -> o { source = update source url}
   Other _ -> o
@@ -135,6 +143,7 @@ data Field
   | Version String
   | Depends [Package]
   | Build [Command]
+  | Install [Command]
   | URL String
   | Other String
   deriving Show
@@ -150,6 +159,7 @@ field = Name <$> fieldParser "name" stringParser
     <|> Version <$> fieldParser "version" stringParser
     <|> Depends <$> fieldParser "depends" (listParser packageParser)
     <|> Build <$> fieldParser "build" (pure <$> try commandParser <|> listParser commandParser)
+    <|> Install <$> fieldParser "install" (pure <$> try commandParser <|> listParser commandParser)
     <|> sectionParser "url" (URL <$> (fieldParser "src" stringParser <* many (noneOf "}")))
     <|> Other <$> (many (noneOf "\n") <* char '\n')
 
@@ -215,4 +225,4 @@ main = do
   getContents >>= \s -> case parse opamFile "(unknown)" s of
     Left e -> print e
     Right fs -> putStrLn $ opam2nix $ evaluateFields
-      (OPAM Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing) fs
+      (OPAM Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing Nothing) fs

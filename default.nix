@@ -32,6 +32,10 @@ let
         inherit name subpkgs;
         src = where;
       }) files);
+
+  dereferenceAll = src:
+    pkgs.runCommandNoCC "remove-symlinks" { }
+    "cp -Lr --no-preserve=mode,ownership ${src} $out";
 in rec {
   opam-nix = pkgs.stdenv.mkDerivation {
     name = "opam-nix";
@@ -43,9 +47,9 @@ in rec {
   };
 
   # Generate a nix file from an opam file
-  opam2nix =
-    { src, opamFile ? findOpamFile src, name ? opamFile + ".nix", ... }:
-    pkgs.runCommandNoCC name { } "cat ${src}/${opamFile} | ${opam-nix} > $out";
+  opam2nix = { src, opamFile ? findOpamFile src, name ? opamFile + ".nix" }:
+    pkgs.runCommandNoCC name { }
+    "( cat ${src}/${opamFile}; echo '' ) | ${opam-nix} > $out";
 
   # Traverse OPAM repository, producing an extension to
   # ocamlPackages than includes all the packages in the repo.
@@ -99,10 +103,16 @@ in rec {
         value = (self.callPackage (opam2nix {
           inherit (p) name src;
           opamFile = "${p.name}.opam";
-        }) { extraArgs = { inherit (p) name src; pname = p.name; }; });
+        }) {
+          extraArgs = {
+            inherit (p) name src;
+            pname = p.name;
+          };
+        });
       }] ++ __callOPAMPackage p.subpkgs self super) xs;
 
   # Extension that adds all the packages from src to the package set
   callOPAMPackage = src: self: super:
-    builtins.listToAttrs (__callOPAMPackage (findOPAMFiles src) self super);
+    builtins.listToAttrs
+    (__callOPAMPackage (findOPAMFiles (dereferenceAll src)) self super);
 }
