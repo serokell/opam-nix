@@ -14,20 +14,16 @@ in
     (builtins.foldl' self.lib.composeExtensions (_: _: { }) [
       (opam-nix.traverseOPAMRepo' (builtins.fetchTarball https://github.com/ocaml/opam-repository/archive/master.tar.gz))
       (opam-nix.traverseOPAMRepo ../my-cool-repo)
-      opam-nix.callOPAMPackage
+      (opam-nix.callOPAMPackage ./.)
       (oself: osuper: {
-        my-cool-package = oself.callOPAMPackage ./. {
-          pname = "my-cool-package";
-          version = self.lib.commitIdFromGitRepo ./.git;
-        } { };
-        
         conf-gmp = self.gmp; # "External" (native) dependencies
         ppx_tools_versioned = osuper.ppx_tools_versioned.versions."5.2.3"; # Force a version
         bigstring = osuper.bigstring.overrideAttrs (_: { doCheck = false; }); # Disable tests
       })
   ]);
 }
-# 
+# default.nix
+import <nixpkgs> { overlays = [ (import ./ocaml-overlay.nix) ]; }
 ```
 
 ## Contents
@@ -48,7 +44,7 @@ The same as `traverseOPAMRepo`, but respects `super` more than `self`, meaning t
 
 ### `callOPAMPackage`
 
-Extends `ocamlPackages` with `callOPAMPackage`, which takes three arguments: the first is the source, the second is `extraArgs`, the third is `overrides`. `extraArgs` can be used to override attributes of `mkDerivation` call, as well as override `opamFile` argument of `opam2nix` and inject dependencies with `extraBuildInputs`.
+Injects all opam packages that are found in src into the package set.
 
 ## FIXME
 

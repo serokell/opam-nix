@@ -40,7 +40,7 @@ opam2nix OPAM {..} =
     inputs = buildInputs' ++ checkInputs' ++ nativeBuildInputs'
     deps = mconcat $ intersperse ", " $ normalize $ inputs
     sepspace = mconcat . intersperse " " . normalize
-    preparephase = mconcat . intersperse " " . mconcat . intersperse ["\n"]
+    preparephase = mconcat . intersperse " "  . mconcat . intersperse ["\n"] . (fmap . fmap) (\x-> "\""<>x<>"\"")
   in
     "{ stdenv, fetchzip, " <>deps<> ", extraArgs ? { } }:\n"
   <>"stdenv.mkDerivation (let self = with self; with extraArgs; {\n"
@@ -110,7 +110,9 @@ evaluateExp =
   let
     repl ('%':'{':xs) = '$':'{':repl xs
     repl ('}':'%':xs) = '}':repl xs
-    repl (':':_:_:_:'}':'%':xs) = '}':repl xs
+    repl (':':'l':'i':'b':'}':'%':xs) = ".lib}"++repl xs
+    repl (':':'b':'i':'n':'}':'%':xs) = ".bin}"++repl xs
+    repl (':':'s':'h':'a':'r':'e':'}':'%':xs) = ".share}"++repl xs
     repl (x:xs) = x:repl xs
     repl "" = ""
     in
@@ -155,7 +157,7 @@ field = Name <$> fieldParser "name" stringParser
 fieldParser :: String -> ParsecT String u Identity t -> ParsecT String u Identity t
 fieldParser name valueParser = try
   $ between
-  (string (name<>":") >> many (oneOf " \n"))
+  ((string name <* many (char ' ') <* char ':') >> many (oneOf " \n"))
   (many $ oneOf " \n")
   valueParser <* commentParser
 
@@ -169,7 +171,7 @@ sectionParser name valueParser = try
 
 -- String is enclosed in quotes
 stringParser :: ParsecT String u Identity String
-stringParser = between (char '"') (char '"') (many $ noneOf "\"")
+stringParser = mconcat <$> between (char '"') (char '"') (many $ ((pure <$> noneOf "\\\"") <|> (string "\\" <> (pure <$> anyChar))))
 
 -- Expression is either a string or a variable
 expParser :: ParsecT String u Identity Exp

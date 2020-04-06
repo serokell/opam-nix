@@ -10,6 +10,28 @@ let
       builtins.throw "Unable to determine a single opam file in ${src} (${
         toString opamFiles
       }), unable to proceed" "";
+
+  subdirs = where:
+    map (x: "${where}/${x.name}") (builtins.filter (x: x.type == "directory")
+      (builtins.attrValues
+        (builtins.mapAttrs (name: type: { inherit name type; })
+          (builtins.readDir where))));
+
+  findOPAMFiles = where:
+    let
+      contents = builtins.readDir where;
+      fName = builtins.match "(.*)\\.opam";
+      files = map (name: builtins.head (fName name))
+        (builtins.filter (name: !isNull (fName name))
+          (builtins.attrNames contents));
+      subpkgs = builtins.concatMap findOPAMFiles (subdirs where);
+    in if files == [ ] then
+      subpkgs
+    else
+      (map (name: {
+        inherit name subpkgs;
+        src = where;
+      }) files);
 in rec {
   opam-nix = pkgs.stdenv.mkDerivation {
     name = "opam-nix";
@@ -70,16 +92,17 @@ in rec {
       else
         v) super;
 
-  # Extension that adds callOPAMPackage to the package set
-  callOPAMPackage = self: super: {
-    callOPAMPackage = src: extraArgs: overrides:
-      (self.callPackage (opam2nix (extraArgs // { inherit src; }))
-        (overrides // { inherit extraArgs; })).overrideAttrs
-      ({ buildInputs, ... }@args: {
-        inherit src;
-        buildInputs = buildInputs ++ extraArgs.extraBuildInputs or [ ];
-        propagatedBuildInputs = buildInputs
-          ++ extraArgs.extraBuildInputs or [ ];
-      });
-  };
+  __callOPAMPackage = xs: self: super:
+    builtins.concatMap (p:
+      [{
+        name = p.name;
+        value = (self.callPackage (opam2nix {
+          inherit (p) name src;
+          opamFile = "${p.name}.opam";
+        }) { extraArgs = { inherit (p) name src; pname = p.name; }; });
+      }] ++ __callOPAMPackage p.subpkgs self super) xs;
+
+  # Extension that adds all the packages from src to the package set
+  callOPAMPackage = src: self: super:
+    builtins.listToAttrs (__callOPAMPackage (findOPAMFiles src) self super);
 }
