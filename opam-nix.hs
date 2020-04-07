@@ -66,7 +66,7 @@ opam2nix OPAM {..} =
               <>"\nrunHook postCheck\n'';\n") checkPhase
   <>"  installPhase = ''\nrunHook preInstall\n"
   <>installPhase'
-  <>"\n  '';\n"
+  <>"\nrunHook postInstall  '';\n"
   <>"}; in self // extraArgs)\n"
 
 update :: Maybe a -> a -> Maybe a
