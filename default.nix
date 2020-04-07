@@ -105,7 +105,11 @@ in rec {
           opamFile = "${p.name}.opam";
         }) {
           extraArgs = {
-            inherit (p) name src;
+            inherit (p) name;
+            src = builtins.path {
+              name = "${p.name}-source";
+              path = builtins.unsafeDiscardStringContext p.src;
+            };
             pname = p.name;
           };
         });
