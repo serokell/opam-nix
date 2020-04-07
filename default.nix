@@ -119,4 +119,13 @@ in rec {
   callOPAMPackage = src: self: super:
     builtins.listToAttrs
     (__callOPAMPackage (findOPAMFiles (dereferenceAll src)) self super);
+
+  # Overrides package sources with values from sources.
+  # Use to speed up builds and reduce the amount of rebuilds due to tarball-ttl expiry.
+  cacheSources = sources: self:
+    builtins.mapAttrs (name: pkg:
+      if sources ? ${name} then
+        pkg.overrideAttrs (_: { src = sources.${name}; })
+      else
+        pkg);
 }

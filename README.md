@@ -46,6 +46,10 @@ The same as `traverseOPAMRepo`, but respects `super` more than `self`, meaning t
 
 Injects all opam packages that are found in src into the package set.
 
+### `cacheSources`
+
+Caches sources for packages that are in `sources`. Use after `traverseOPAMRepo` to speed up builds.
+
 ## FIXME
 
 While this does work for my use-cases, it's obviously awful and needs help. If you actually know ocaml, you can help by rewriting `opam-nix.hs` in it using `opam-file-format`!
