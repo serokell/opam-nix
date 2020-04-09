@@ -2,12 +2,10 @@
 
 import Text.Parsec
 import Data.Functor.Identity (Identity ())
-import System.Environment (getEnv)
 import System.IO
-import Data.Maybe (fromJust, isNothing, maybeToList)
+import Data.Maybe (isNothing, maybeToList)
 import Control.Monad (void)
-import Data.List (intersperse, nub, isPrefixOf)
-import qualified Control.Applicative as A (optional)
+import Data.List (intersperse, nub, isSuffixOf, isPrefixOf)
 
 data OPAM
   = OPAM
@@ -44,9 +42,10 @@ opam2nix OPAM {..} =
     inputs = buildInputs' ++ checkInputs' ++ nativeBuildInputs'
     deps = mconcat $ intersperse ", " $ normalize $ inputs
     sepspace = mconcat . intersperse " " . normalize
-    preparephase = mconcat . intersperse " "  . mconcat . intersperse ["\n"] . (fmap . fmap) (\x-> "\""<>x<>"\"")
+    quote s = "\""<>s<>"\""
+    preparephase = mconcat . intersperse " "  . mconcat . intersperse ["\n"] . (fmap . fmap) quote
   in
-    "{ stdenv, fetchzip, " <>deps<> ", extraArgs ? { } }:\n"
+    "{ stdenv, fetchzip, lib, " <>deps<> ", extraArgs ? { } }@args:\n"
   <>"stdenv.mkDerivation (let self = with self; with extraArgs; {\n"
   <>foldMap (\name' -> "  pname = \""<>name'<>"\";\n") name
   <>foldMap (\version' -> "  version = \""<>version'<>"\";\n") version
@@ -120,21 +119,28 @@ data Exp = Str String | Var String deriving Show
 evaluateExp :: Exp -> String
 evaluateExp =
   let
-    repl ('%':'{':xs) = '$':'{':repl xs
-    repl ('}':'%':xs) = '}':repl xs
-    repl (':':'l':'i':'b':'}':'%':xs) = ".lib}"++repl xs
-    repl (':':'b':'i':'n':'}':'%':xs) = ".bin}"++repl xs
-    repl (':':'s':'h':'a':'r':'e':'}':'%':xs) = ".share}"++repl xs
-    repl (x:xs) = x:repl xs
-    repl "" = ""
+    repl :: ParsecT String u Identity [Either String Exp]
+    repl = many ((Right <$> exp) <|> (Left <$> str)) <* eof
+    str = many1 $ noneOf "%"
+    exp = Var <$> between (string "%{") (string "}%") (many $ noneOf "}")
+    replace (':':xs) = '.':replace xs
+    replace (x:xs) = x:replace xs
+    replace [] = []
     in
     \case
-      Str s -> repl s
+      Str s -> case parse repl "<string>" s of
+        Left _ -> s
+        Right eithers -> mconcat $ (\case
+          Left s -> s
+          Right e -> evaluateExp e) <$> eithers
       Var "name" -> "${pname}"
       Var "make" -> "make"
       Var "prefix" -> "$out"
       Var "jobs" -> "1"
-      Var s -> "${"<>s<>"}"
+      Var "pinned" -> "false"
+      Var s
+        | ":installed" `isSuffixOf` s -> "${if args ? "<>takeWhile (/=':') s<>" then \"true\" else \"false\"}"
+        | otherwise -> "${"<>replace s<>"}"
 
 data Command
   = Command
@@ -164,7 +170,7 @@ field = Name <$> fieldParser "name" stringParser
     <|> Depends <$> fieldParser "depends" (listParser packageParser)
     <|> Build <$> fieldParser "build" (pure <$> try commandParser <|> listParser commandParser)
     <|> Install <$> fieldParser "install" (pure <$> try commandParser <|> listParser commandParser)
-    <|> sectionParser "url" (URL <$> (fieldParser "src" stringParser <* many (noneOf "}")))
+    <|> sectionParser "url" (URL <$> ((fieldParser "src" stringParser <|> fieldParser "archive" stringParser) <* many (noneOf "}")))
     <|> Other <$> (many (noneOf "\n") <* char '\n')
 
 -- Field's structure is "name: value"
