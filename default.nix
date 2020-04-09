@@ -48,8 +48,10 @@ in rec {
 
   # Generate a nix file from an opam file
   opam2nix = { src, opamFile ? findOpamFile src, name ? opamFile + ".nix" }:
-    pkgs.runCommandNoCC name { }
-    "( cat ${src}/${opamFile}; echo '' ) | ${opam-nix} > $out";
+    pkgs.runCommandNoCC name {
+      preferLocalBuild = true;
+      allowSubstitutes = false;
+    } "( cat ${src}/${opamFile}; echo '' ) | ${opam-nix} > $out";
 
   # Traverse OPAM repository, producing an extension to
   # ocamlPackages than includes all the packages in the repo.
