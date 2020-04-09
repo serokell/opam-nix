@@ -51,6 +51,7 @@ opam2nix OPAM {..} =
   <>foldMap (\name' -> "  pname = \""<>name'<>"\";\n") name
   <>foldMap (\version' -> "  version = \""<>version'<>"\";\n") version
   <>foldMap (\url -> "  src = builtins.fetchTarball { url = \""<>url<>"\"; };\n") source
+  <>"  outputs = [ \"out\" \"bin\" \"lib\" \"share\" ];\n"
   <>"  buildInputs = [ "<>sepspace buildInputs'<>" ];\n"
   <>"  checkInputs = [ "<>sepspace checkInputs'<>" ];\n"
   <>"  nativeBuildInputs = [ "<>sepspace nativeBuildInputs'<>" ];\n"
@@ -65,8 +66,11 @@ opam2nix OPAM {..} =
               <>preparephase checkPhase'
               <>"\nrunHook postCheck\n'';\n") checkPhase
   <>"  installPhase = ''\nrunHook preInstall\n"
-  <>installPhase'
-  <>"\nrunHook postInstall  '';\n"
+  <>installPhase'<>"\n"
+  <>"if [[ -d $OCAMLFIND_DESTDIR/${pname} ]]; then cp -aLl $OCAMLFIND_DESTDIR/${pname} $lib; else touch $lib; fi\n"
+  <>"if [[ -d $out/bin ]]; then cp -aLl $out/bin $bin; else touch $bin; fi\n"
+  <>"if [[ -d $out/share ]]; then cp -aLl $out/share $share; else touch $share; fi\n"
+  <>"runHook postInstall\n  '';\n"
   <>"}; in self // extraArgs)\n"
 
 update :: Maybe a -> a -> Maybe a
