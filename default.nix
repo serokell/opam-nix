@@ -35,7 +35,7 @@ let
 
   dereferenceAll = src:
     pkgs.runCommandNoCC "remove-symlinks" { }
-    "cp -Lr --no-preserve=mode,ownership ${src} $out";
+    "cp -Lr --no-preserve=ownership ${src} $out";
 in rec {
   opam-nix = pkgs.stdenv.mkDerivation {
     name = "opam-nix";

@@ -136,8 +136,8 @@ evaluateExp =
       Var "name" -> "${pname}"
       Var "make" -> "make"
       Var "prefix" -> "$out"
-      Var "jobs" -> "1"
       Var "pinned" -> "false"
+      Var "jobs" -> "$NIX_BUILD_CORES"
       Var s
         | ":installed" `isSuffixOf` s -> "${if args ? "<>takeWhile (/=':') s<>" then \"true\" else \"false\"}"
         | otherwise -> "${"<>replace s<>"}"
