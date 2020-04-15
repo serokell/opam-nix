@@ -66,9 +66,9 @@ opam2nix OPAM {..} =
               <>"\nrunHook postCheck\n'';\n") checkPhase
   <>"  installPhase = ''\nrunHook preInstall\n"
   <>installPhase'<>"\n"
-  <>"if [[ -d $OCAMLFIND_DESTDIR/${pname} ]]; then cp -aLl $OCAMLFIND_DESTDIR/${pname} $lib; else touch $lib; fi\n"
-  <>"if [[ -d $out/bin ]]; then cp -aLl $out/bin $bin; else touch $bin; fi\n"
-  <>"if [[ -d $out/share ]]; then cp -aLl $out/share $share; else touch $share; fi\n"
+  <>"if [[ -d $OCAMLFIND_DESTDIR/${pname} ]]; then mv $OCAMLFIND_DESTDIR/${pname} $lib; ln -s $lib $OCAMLFIND_DESTDIR/${pname}; else touch $lib; fi\n"
+  <>"if [[ -d $out/bin ]]; then mv $out/bin $bin; ln -s $bin $out/bin; else touch $bin; fi\n"
+  <>"if [[ -d $out/share ]]; then mv $out/share $share; ln -s $share $out/share; else touch $share; fi\n"
   <>"runHook postInstall\n  '';\n"
   <>"}; in self // extraArgs)\n"
 
