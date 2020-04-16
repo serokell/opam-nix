@@ -33,9 +33,14 @@ let
         src = where;
       }) files);
 
+  # Make name of src constant
+  fixName = path: builtins.path {
+    name = "source";
+    path = builtins.unsafeDiscardStringContext path;
+  };
   dereferenceAll = src:
     pkgs.runCommandNoCC "remove-symlinks" { }
-    "cp -Lr --no-preserve=ownership ${src} $out";
+    "cp -Lr --no-preserve=ownership ${fixName src} $out; chmod +w $out";
 in rec {
   opam-nix = pkgs.stdenv.mkDerivation {
     name = "opam-nix";
