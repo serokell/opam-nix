@@ -1,3 +1,9 @@
+<!--
+   - SPDX-FileCopyrightText: 2020 Serokell <https://serokell.io/>
+   -
+   - SPDX-License-Identifier: MPL-2.0
+   -->
+
 # opam-nix
 
 A library for packaging OCaml software.
@@ -50,12 +56,19 @@ Injects all opam packages that are found in src into the package set.
 
 Caches sources for packages that are in `sources`. Use after `traverseOPAMRepo` to speed up builds.
 
-## FIXME
-
-While this does work for my use-cases, it's obviously awful and needs help. If you actually know ocaml, you can help by rewriting `opam-nix.hs` in it using `opam-file-format`!
-
 ## TODO
 
 - Proper parser;
 - Automatic version resolution;
-- Support for cross-compilation and proper "external" dependencies (currently they're hacked together).
+- Support for cross-compilation and proper "external" dependencies.
+
+## Legal
+
+This repository is licensed under Mozilla Public License, version 2.
+
+## About Serokell
+
+This repository is maintained with ❤️ by [Serokell](https://serokell.io/).
+The names and logo for Serokell are trademark of Serokell OÜ.
+
+We love open source software! See [our other projects](https://serokell.io/community?utm_source=github) or [hire us](https://serokell.io/hire-us?utm_source=github) to design, develop and grow your idea!
