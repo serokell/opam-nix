@@ -53,7 +53,7 @@ opam2nix OPAM {..} =
   <>"stdenv.mkDerivation (let self = with self; with extraArgs; {\n"
   <>foldMap (\name' -> "  pname = \""<>name'<>"\";\n") name
   <>foldMap (\version' -> "  version = \""<>version'<>"\";\n") version
-  <>foldMap (\url -> "  src = builtins.fetchTarball { url = \""<>url<>"\"; };\n") source
+  <>foldMap (\url -> "  src = fetchzip { url = \""<>url<>"\"; };\n") source
   <>"  outputs = [ \"out\" \"bin\" \"lib\" \"share\" ];\n"
   <>"  buildInputs = [ "<>sepspace buildInputs'<>" ];\n"
   <>"  checkInputs = [ "<>sepspace checkInputs'<>" ];\n"
