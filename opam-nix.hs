@@ -34,7 +34,7 @@ opam2nix OPAM {..} =
       ++ (filter (isPrefixOf "conf-") $ mconcat $ maybeToList nativeBuildInputs)
       ++ mconcat (maybeToList buildInputs);
     checkInputs' = mconcat $ maybeToList checkInputs
-    nativeBuildInputs' = [ "dune", "opaline", "ocaml", "findlib" ]
+    nativeBuildInputs' = [ "dune_2", "opaline", "ocaml", "findlib" ]
       ++ (if any (isPrefixOf "conf-")
            (buildInputs' ++ checkInputs' ++ mconcat (maybeToList nativeBuildInputs))
            then ["conf-pkg-config"]
