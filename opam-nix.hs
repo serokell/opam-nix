@@ -7,9 +7,9 @@
 import Text.Parsec
 import Data.Functor.Identity (Identity ())
 import System.IO
-import Data.Maybe (isNothing, maybeToList)
+import Data.Maybe (catMaybes, isNothing, maybeToList)
 import Control.Monad (void)
-import Data.List (intersperse, nub, isSuffixOf, isPrefixOf)
+import Data.List (stripPrefix, intersperse, nub, isSuffixOf, isPrefixOf)
 
 data OPAM
   = OPAM
@@ -21,8 +21,14 @@ data OPAM
   , checkInputs :: Maybe [String]
   , checkPhase :: Maybe [[String]]
   , installPhase :: Maybe [[String]]
-  , source :: Maybe String
+  , source :: Maybe (String, [Hash])
   } deriving Show
+
+data Source = Source
+  { sUrl :: String
+  , sSha256 :: Maybe String
+  , sSha512 :: Maybe String
+  }
 
 -- Turn a description into a nix file
 opam2nix :: OPAM -> String
@@ -34,7 +40,7 @@ opam2nix OPAM {..} =
       ++ (filter (isPrefixOf "conf-") $ mconcat $ maybeToList nativeBuildInputs)
       ++ mconcat (maybeToList buildInputs);
     checkInputs' = mconcat $ maybeToList checkInputs
-    nativeBuildInputs' = [ "dune_2", "opaline", "ocaml", "findlib" ]
+    nativeBuildInputs' = [ "dune_2", "opaline", "ocaml", "findlib", "gnutar" ]
       ++ (if any (isPrefixOf "conf-")
            (buildInputs' ++ checkInputs' ++ mconcat (maybeToList nativeBuildInputs))
            then ["conf-pkg-config"]
@@ -49,11 +55,11 @@ opam2nix OPAM {..} =
     quote s = "\""<>s<>"\""
     preparephase = mconcat . intersperse " "  . mconcat . intersperse ["\n"] . (fmap . fmap) quote
   in
-    "{ stdenv, fetchzip, lib, " <>deps<> ", extraArgs ? { } }@args:\n"
+    "{ stdenv, fetchurl, lib, " <>deps<> ", extraArgs ? { } }@args:\n"
   <>"stdenv.mkDerivation (let self = with self; with extraArgs; {\n"
   <>foldMap (\name' -> "  pname = \""<>name'<>"\";\n") name
   <>foldMap (\version' -> "  version = \""<>version'<>"\";\n") version
-  <>foldMap (\url -> "  src = builtins.fetchTarball { url = \""<>url<>"\"; };\n") source
+  <>foldMap (\(url, hashes) -> "  src = fetchurl { url = \""<>url<>"\"; " <> handleHashes hashes <> " };\n") source
   <>"  outputs = [ \"out\" \"bin\" \"lib\" \"share\" ];\n"
   <>"  buildInputs = [ "<>sepspace buildInputs'<>" ];\n"
   <>"  checkInputs = [ "<>sepspace checkInputs'<>" ];\n"
@@ -76,6 +82,18 @@ opam2nix OPAM {..} =
   <>"runHook postInstall\n  '';\n"
   <>"  preFixup = \"if [[ -d $bin ]]; then strip -S $bin/*; fi\";\n"
   <>"}; in self // extraArgs)\n"
+  where
+    handleHashes :: [Hash] -> String
+    handleHashes = concatMap $ \hash ->
+      getPrefix hash <> " = \"" <> getBytes hash <> "\";\n"
+
+    getPrefix :: Hash -> String
+    getPrefix (Sha256Hash _) = "sha256"
+    getPrefix (Sha512Hash _) = "sha512"
+
+    getBytes :: Hash -> String
+    getBytes (Sha256Hash h) = h
+    getBytes (Sha512Hash h) = h
 
 update :: Maybe a -> a -> Maybe a
 update old new = if isNothing old then Just new else old
@@ -103,7 +121,7 @@ evaluateField o@OPAM {..} = \case
   Install e -> o {
     installPhase = update installPhase $ fmap ((fmap evaluateExp) . command) e
   }
-  URL url -> o { source = update source url}
+  Sources url hashes -> o { source = update source (url, hashes)}
   Other _ -> o
 
 evaluateFields :: OPAM -> [Field] -> OPAM
@@ -159,10 +177,14 @@ data Field
   | Depends [Package]
   | Build [Command]
   | Install [Command]
-  | URL String
+  | Sources String [Hash]
   | Other String
   deriving Show
 
+data Hash
+  = Sha256Hash String
+  | Sha512Hash String
+  deriving Show
 
 -- An opam file is a collection of fields,
 opamFile :: ParsecT String u Identity [Field]
@@ -175,7 +197,10 @@ field = Name <$> fieldParser "name" stringParser
     <|> Depends <$> fieldParser "depends" (listParser packageParser)
     <|> Build <$> fieldParser "build" (pure <$> try commandParser <|> listParser commandParser)
     <|> Install <$> fieldParser "install" (pure <$> try commandParser <|> listParser commandParser)
-    <|> sectionParser "url" (URL <$> ((fieldParser "src" stringParser <|> fieldParser "archive" stringParser) <* many (noneOf "}")))
+    <|> sectionParser "url" (Sources <$>
+                             (fieldParser "src" stringParser <|> fieldParser "archive" stringParser) <*>
+                             (catMaybes <$> fieldParser "checksum" ((pure <$> try hashParser) <|> listParser hashParser)) <* many (noneOf "}")
+                            )
     <|> Other <$> (many (noneOf "\n") <* char '\n')
 
 -- Field's structure is "name: value"
@@ -193,6 +218,16 @@ sectionParser name valueParser = try
   (string name >> many (oneOf " ") >> string "{" >> many (oneOf " \n"))
   (many (oneOf " \n") >> char '}' >> char '\n')
   valueParser
+
+hashParser :: ParsecT String u Identity (Maybe Hash)
+hashParser = between (many $ char ' ') (many $ oneOf " \n") $ do
+  parse <$> stringParser
+  where
+    parse :: String -> Maybe Hash
+    parse s | Just hash <- stripPrefix "sha256=" s = Just $ Sha256Hash hash
+            | Just hash <- stripPrefix "sha512=" s = Just $ Sha512Hash hash
+    parse _ = Nothing
+
 
 -- String is enclosed in quotes
 stringParser :: ParsecT String u Identity String
