@@ -28,7 +28,11 @@ data OPAM
 opam2nix :: OPAM -> String
 opam2nix OPAM {..} =
   let
-    normalize = nub . map (\case 'b':'a':'s':'e':'-':_ -> "base"; s -> s)
+    normalize = nub . map (\case
+        'b':'a':'s':'e':'-':_ -> "base"
+        "unix" -> "base"
+        s -> s
+      )
     buildInputs' = [ "findlib" ]
       -- conf-* packages are added with {build}, hack it so that it builds!
       ++ (filter (isPrefixOf "conf-") $ mconcat $ maybeToList nativeBuildInputs)
