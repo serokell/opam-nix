@@ -48,10 +48,11 @@ opam2nix OPAM {..} =
     sepspace = mconcat . intersperse " " . normalize
     quote s = "\""<>s<>"\""
     preparephase = mconcat . intersperse " "  . mconcat . intersperse ["\n"] . (fmap . fmap) quote
+    doCheckAsserts = intercalate "\n" (map (\x -> "assert self.doCheck -> " <> x <> " != null;") checkInputs')
   in
-    "{ stdenv, fetchurl, lib, " <>deps<> ", doCheck ? true, extraArgs ? { } }@args:\n"
-  <> intercalate "\n" (map (\x -> "assert doCheck -> " <> x <> " != null;") checkInputs')
-  <>"stdenv.mkDerivation (let self = with self; with extraArgs; {\n"
+    "{ stdenv, fetchurl, lib, " <>deps<> ", extraArgs ? { } }@args:\n"
+  <>"stdenv.mkDerivation (let self = with self; with extraArgs;"
+  <> doCheckAsserts <> "\n{\n"
   <>foldMap (\name' -> "  pname = \""<>name'<>"\";\n") name
   <>foldMap (\version' -> "  version = \""<>version'<>"\";\n") version
   <>foldMap (\(url, hashes) -> "  src = fetchurl { url = \""<>url<>"\"; " <> handleHashes hashes <> " };\n") source
