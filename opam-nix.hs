@@ -9,7 +9,7 @@ import Data.Functor.Identity (Identity ())
 import System.IO
 import Data.Maybe (catMaybes, isNothing, maybeToList)
 import Control.Monad (void)
-import Data.List (stripPrefix, intersperse, nub, isSuffixOf, isPrefixOf)
+import Data.List (stripPrefix, intercalate, intersperse, nub, isSuffixOf, isPrefixOf)
 
 data OPAM
   = OPAM
@@ -43,13 +43,14 @@ opam2nix OPAM {..} =
     installPhase' = case installPhase of
       Just c -> "mkdir -p $OCAMLFIND_DESTDIR\n" <> preparephase c
       Nothing -> "opaline -prefix $out -libdir $OCAMLFIND_DESTDIR"
-    inputs = buildInputs' ++ checkInputs' ++ nativeBuildInputs'
+    inputs = buildInputs' ++ ((<>" ? null") <$> checkInputs') ++ nativeBuildInputs'
     deps = mconcat $ intersperse ", " $ normalize $ inputs
     sepspace = mconcat . intersperse " " . normalize
     quote s = "\""<>s<>"\""
     preparephase = mconcat . intersperse " "  . mconcat . intersperse ["\n"] . (fmap . fmap) quote
   in
-    "{ stdenv, fetchurl, lib, " <>deps<> ", extraArgs ? { } }@args:\n"
+    "{ stdenv, fetchurl, lib, " <>deps<> ", doCheck ? true, extraArgs ? { } }@args:\n"
+  <> intercalate "\n" (map (\x -> "assert doCheck -> " <> x <> " != null;") checkInputs')
   <>"stdenv.mkDerivation (let self = with self; with extraArgs; {\n"
   <>foldMap (\name' -> "  pname = \""<>name'<>"\";\n") name
   <>foldMap (\version' -> "  version = \""<>version'<>"\";\n") version
