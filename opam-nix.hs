@@ -36,8 +36,8 @@ data PackageInputs = PackageInputs
 printInputs :: PackageInputs -> String
 printInputs PackageInputs{..} =
   "{ stdenv, fetchurl, lib"
-  <> pPrintInputs (union piNativeBuildInputs piBuildInputs)
-  <> pPrintInputs (Set.map (<>" ? null") onlyCheckInputs)
+  <> pPrintInputs (Set.map normalizeInput $ union piNativeBuildInputs piBuildInputs)
+  <> pPrintInputs (Set.map ((<> " ? null") . normalizeInput) onlyCheckInputs)
   <> ", extraArgs ? { } }@args:\n"
   where
     -- to avoide duplicates
@@ -46,7 +46,7 @@ printInputs PackageInputs{..} =
     sepcoma = intercalate ", "
     pPrintInputs :: Set String -> String
     pPrintInputs inputs =
-      bool "" (", " <> sepcoma (map normalizeInput $ toList inputs)) $ not $ null inputs
+      bool "" (", " <> sepcoma (toList inputs)) $ not $ null inputs
     normalizeInput input
       | "base-" `isPrefixOf` input = "base"
       | otherwise = input
