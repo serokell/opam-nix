@@ -129,8 +129,11 @@ evaluateField o@OPAM {..} = \case
   Version s -> o { version = update version s }
   Depends s -> o {
     buildInputs = update buildInputs $
-      fmap identifier $ filter (\(Package _ info) ->
-                                  not $ ("with-test" `elem` info || "build" `elem` info)) s,
+      fmap identifier $ filter (\(Package name info) ->
+                                  -- ppx_inline_test is used for inlining tests to the source code
+                                  -- and usually needed during the build.
+                                  name == "ppx_inline_test" || not ("with-test" `elem` info || "build" `elem` info)
+                               ) s,
     nativeBuildInputs = update nativeBuildInputs $
       fmap identifier $ filter (\(Package _ info) -> "build" `elem` info) s,
     checkInputs = update checkInputs $
