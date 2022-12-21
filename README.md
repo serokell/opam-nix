@@ -6,6 +6,8 @@
 
 # opam-nix
 
+WARNING: THIS REPOSITORY IS ARCHIVED AND NO LONGER MAINTAINED
+
 A library for packaging OCaml software.
 
 TL;DR:
