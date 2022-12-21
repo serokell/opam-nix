@@ -8,6 +8,8 @@
 
 WARNING: THIS REPOSITORY IS ARCHIVED AND NO LONGER MAINTAINED
 
+Consider using [tweag/opam-nix](https://github.com/tweag/opam-nix) instead.
+
 A library for packaging OCaml software.
 
 TL;DR:
